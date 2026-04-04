@@ -1,0 +1,4 @@
+{
+  "desc": "店评小帮",
+  "rules": [{ "action": "allow", "page": "*" }]
+}

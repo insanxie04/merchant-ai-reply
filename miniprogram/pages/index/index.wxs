@@ -1,0 +1,20 @@
+/** 判断某条回复是否已在收藏列表中（wxml 内调用） */
+function favorited(list, text) {
+  if (!list || !text) return false;
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].text === text) return true;
+  }
+  return false;
+}
+
+/** 读取点赞/点踩状态（兼容数字下标与字符串 key） */
+function feedback(map, idx) {
+  if (!map) return "";
+  var s = "" + idx;
+  if (map[s]) return map[s];
+  if (map[idx]) return map[idx];
+  return "";
+}
+
+module.exports.favorited = favorited;
+module.exports.feedback = feedback;

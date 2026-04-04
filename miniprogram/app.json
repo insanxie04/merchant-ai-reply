@@ -1,0 +1,18 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/privacy/privacy",
+    "pages/disclaimer/disclaimer",
+    "pages/about/about"
+  ],
+  "window": {
+    "navigationBarTitleText": "店评小帮",
+    "navigationBarBackgroundColor": "#FFD100",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#F7F7F7",
+    "backgroundTextStyle": "dark"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

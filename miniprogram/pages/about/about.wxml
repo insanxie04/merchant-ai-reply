@@ -1,0 +1,12 @@
+<scroll-view scroll-y class="scroll">
+  <view class="doc">
+    <text class="h1">店评小帮</text>
+    <text class="p">「店评小帮」是一款面向线下门店经营者的通用评价回复辅助工具，帮助您根据顾客评价内容，快速生成多风格、可编辑的公开回复文案建议，节省撰写时间。</text>
+    <text class="h2">适用场景</text>
+    <text class="p">适用于餐饮、零售、生活服务等多种门店场景。您可自选经营品类、回复语气与评价倾向（好评/中评/差评），并可结合自定义描述进一步贴合店铺人设。</text>
+    <text class="h2">使用方式</text>
+    <text class="p">支持拍照或从相册选择含评价文字的图片进行识别，也支持直接粘贴评价原文；无需注册登录，收藏内容仅保存在您的手机本地。</text>
+    <text class="h2">说明</text>
+    <text class="p">本工具为效率辅助类应用，生成内容需您自行审核后再使用。详见《AI 免责声明》与《隐私政策》。</text>
+  </view>
+</scroll-view>

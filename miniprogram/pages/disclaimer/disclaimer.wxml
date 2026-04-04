@@ -1,0 +1,14 @@
+<scroll-view scroll-y class="scroll">
+  <view class="doc">
+    <text class="h1">人工智能生成内容免责声明</text>
+    <text class="p">本工具通过人工智能技术，根据您输入的评价内容、所选品类与风格等参数，自动生成回复文案建议。</text>
+    <text class="h2">一、仅供参考</text>
+    <text class="p">生成内容仅供您参考与修改后使用，不构成法律、财务、商业或其他专业意见，也不构成对任何平台规则的保证。</text>
+    <text class="h2">二、准确性</text>
+    <text class="p">AI 输出可能存在不准确、不恰当或与实际情况不符之处。请您在发布前自行审核、编辑，并对最终对外发布的内容负责。</text>
+    <text class="h2">三、使用风险</text>
+    <text class="p">因使用或依赖本工具生成内容而产生的任何直接或间接后果，由使用者自行承担。开发者不对因使用生成内容导致的纠纷、处罚或损失承担责任。</text>
+    <text class="h2">四、合规发布</text>
+    <text class="p">您应遵守法律法规及各应用平台、社区的相关规则，不得利用本工具生成违法、侵权、虚假或误导性内容。</text>
+  </view>
+</scroll-view>

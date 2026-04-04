@@ -1,0 +1,14 @@
+/** 全局样式：与网页端主色 #FFD100 对齐 */
+page {
+  background-color: #f7f7f7;
+  color: #1a1a1a;
+  font-size: 28rpx;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+/* 安全区：底部 Home 条 */
+.safe-bottom {
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}

@@ -1,0 +1,22 @@
+{
+  "miniprogramRoot": "./",
+  "projectname": "dianping-xiaobang-mp",
+  "projectName": "dianping-xiaobang-mp",
+  "description": "店评小帮 · 通用商家评价回复助手（原生小程序）",
+  "appid": "touristappid",
+  "compileType": "miniprogram",
+  "libVersion": "3.5.5",
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "coverView": true
+  },
+  "condition": {}
+}

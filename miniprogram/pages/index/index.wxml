@@ -1,0 +1,161 @@
+<wxs src="./index.wxs" module="fx" />
+
+<view class="page safe-bottom">
+  <!-- 评价原文：上下各约 50% -->
+  <view class="card">
+    <view class="card-title">评价原文</view>
+    <view class="review-split">
+      <view class="upload-half">
+        <block wx:if="{{!imageTempPath}}">
+          <view class="upload-empty" bindtap="chooseImage">
+            <text class="upload-icon">📷</text>
+            <text class="upload-main">拍照/选择图片上传</text>
+            <text class="upload-sub">支持 JPG/PNG，自动识别评价文字</text>
+          </view>
+        </block>
+        <block wx:else>
+          <image class="preview-img" src="{{imageTempPath}}" mode="aspectFit" />
+          <view class="preview-actions">
+            <button class="btn-outline btn-sm" bindtap="chooseImage" disabled="{{loading}}">重新上传</button>
+            <button class="btn-outline btn-sm" bindtap="extractOnly" disabled="{{loading}}">识别文字</button>
+            <button class="btn-ghost btn-sm" bindtap="clearImage" disabled="{{loading}}">移除图片</button>
+          </view>
+        </block>
+      </view>
+      <view class="textarea-half">
+        <textarea
+          class="review-textarea"
+          value="{{review}}"
+          bindinput="onReviewInput"
+          placeholder="或手动粘贴评价内容..."
+          maxlength="8000"
+          disabled="{{loading}}"
+        />
+      </view>
+    </view>
+    <text class="error-text" wx:if="{{reviewError}}">{{reviewError}}</text>
+  </view>
+
+  <!-- 参数：两行 -->
+  <view class="card">
+    <view class="param-block">
+      <text class="label">商家品类</text>
+      <picker mode="selector" range="{{categoryRange}}" value="{{categoryIndex}}" bindchange="onCategoryChange" disabled="{{loading}}">
+        <view class="picker-row">
+          <text class="picker-text">{{categoryRange[categoryIndex]}}</text>
+          <text class="picker-arrow">▼</text>
+        </view>
+      </picker>
+      <input
+        wx:if="{{categoryIndex === categoryOtherIndex}}"
+        class="custom-input"
+        value="{{categoryCustomText}}"
+        bindinput="onCategoryCustomInput"
+        placeholder="例如：宠物医院"
+        placeholder-class="ph-gray"
+        maxlength="50"
+        disabled="{{loading}}"
+      />
+    </view>
+
+    <view class="param-row-dual">
+      <view class="param-half">
+        <text class="label">回复风格</text>
+        <picker mode="selector" range="{{styleRange}}" value="{{styleIndex}}" bindchange="onStyleChange" disabled="{{loading}}">
+          <view class="picker-row">
+            <text class="picker-text ellipsis">{{styleRange[styleIndex]}}</text>
+            <text class="picker-arrow">▼</text>
+          </view>
+        </picker>
+        <input
+          wx:if="{{styleIndex === styleCustomIndex}}"
+          class="custom-input"
+          value="{{styleCustomText}}"
+          bindinput="onStyleCustomInput"
+          placeholder="例如：10年老店店主，说话接地气"
+          placeholder-class="ph-gray"
+          maxlength="100"
+          disabled="{{loading}}"
+        />
+      </view>
+      <view class="param-half">
+        <text class="label">评价类型</text>
+        <picker mode="selector" range="{{ratingRange}}" value="{{ratingIndex}}" bindchange="onRatingChange" disabled="{{loading}}">
+          <view class="picker-row">
+            <text class="picker-text">{{ratingRange[ratingIndex]}}</text>
+            <text class="picker-arrow">▼</text>
+          </view>
+        </picker>
+      </view>
+    </view>
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="btn-row">
+    <button class="btn-primary" bindtap="generate" loading="{{loading}}" disabled="{{loading}}">生成回复</button>
+    <button class="btn-secondary" bindtap="recognizeAndGenerate" disabled="{{loading || !imageTempPath}}">识别并生成</button>
+  </view>
+
+  <!-- 加载/错误 -->
+  <view class="status-block" wx:if="{{loading}}">
+    <text class="status-text">{{loadingHint || '请稍候…'}}</text>
+  </view>
+  <view class="error-banner" wx:if="{{error && !loading}}">{{error}}</view>
+
+  <!-- 生成结果 -->
+  <view class="section-title" wx:if="{{replies.length}}">生成结果</view>
+  <view class="reply-list">
+    <view class="reply-card" wx:for="{{replies}}" wx:key="*this" wx:for-index="ri">
+      <text class="reply-body">{{item}}</text>
+      <view class="reply-actions">
+        <button class="action-pill {{fx.feedback(replyFeedback, ri) === 'like' ? 'active' : ''}}" data-index="{{ri}}" data-kind="like" bindtap="toggleFeedback">点赞</button>
+        <button class="action-pill {{fx.feedback(replyFeedback, ri) === 'dislike' ? 'active-d' : ''}}" data-index="{{ri}}" data-kind="dislike" bindtap="toggleFeedback">点踩</button>
+        <button class="action-pill {{fx.favorited(favorites, item) ? 'active-f' : ''}}" data-index="{{ri}}" bindtap="toggleFavorite">收藏</button>
+        <button class="action-pill primary-lite" data-index="{{ri}}" bindtap="copyReply">复制</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 收藏夹 -->
+  <view class="fav-panel card">
+    <view class="fav-header" bindtap="toggleFavoritesPanel">
+      <text class="fav-title">收藏夹</text>
+      <text class="fav-chevron {{favoritesOpen ? 'open' : ''}}">▼</text>
+    </view>
+    <view wx:if="{{favoritesOpen}}" class="fav-body">
+      <text class="fav-tip">数据仅保存在本机，换设备后不会同步。收藏时按当前「评价类型」归入对应分栏。</text>
+      <view class="fav-tabs">
+        <view class="fav-tab {{favoriteTab === 'praise' ? 'on' : ''}}" data-tab="praise" bindtap="onFavoriteTab">好评</view>
+        <view class="fav-tab {{favoriteTab === 'neutral' ? 'on' : ''}}" data-tab="neutral" bindtap="onFavoriteTab">中评</view>
+        <view class="fav-tab {{favoriteTab === 'negative' ? 'on' : ''}}" data-tab="negative" bindtap="onFavoriteTab">差评</view>
+      </view>
+      <view wx:if="{{!filteredFavorites.length}}" class="fav-empty">暂无收藏</view>
+      <block wx:for="{{filteredFavorites}}" wx:key="id">
+        <view class="fav-item">
+          <text class="fav-text">{{item.text}}</text>
+          <textarea
+            class="fav-note"
+            value="{{item.note}}"
+            data-id="{{item.id}}"
+            bindinput="onFavNoteInput"
+            placeholder="备注（可选）"
+            auto-height
+          />
+          <view class="fav-item-actions">
+            <button class="btn-outline btn-sm" data-id="{{item.id}}" bindtap="copyFavorite">复制</button>
+            <button class="btn-danger-text btn-sm" data-id="{{item.id}}" bindtap="removeFavorite">删除</button>
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <!-- 合规入口 -->
+  <view class="legal-bar">
+    <navigator url="/pages/privacy/privacy" class="legal-link">隐私政策</navigator>
+    <text class="legal-sep">|</text>
+    <navigator url="/pages/disclaimer/disclaimer" class="legal-link">AI免责</navigator>
+    <text class="legal-sep">|</text>
+    <navigator url="/pages/about/about" class="legal-link">关于</navigator>
+  </view>
+</view>
