@@ -1,0 +1,9 @@
+# 与 DEPLOY-HK.md 配合使用。在服务器项目目录放置 .env（勿提交 Git）
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    restart: unless-stopped
