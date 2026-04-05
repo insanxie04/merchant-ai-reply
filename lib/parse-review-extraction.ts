@@ -9,7 +9,7 @@ export function parseReviewExtraction(content: string): string {
   try {
     parsed = JSON.parse(slice) as unknown;
   } catch {
-    throw new Error("识别结果无法解析，请换一张更清晰的美团评价截图重试。");
+    throw new Error("识别结果无法解析，请换一张更清晰的评价截图重试。");
   }
 
   if (
@@ -23,7 +23,7 @@ export function parseReviewExtraction(content: string): string {
   const review = String((parsed as { review: unknown }).review).trim();
   if (!review) {
     throw new Error(
-      "未能从图片中识别出评价文字，请上传包含评价正文的美团评价截图。"
+      "未能从图片中识别出评价文字，请上传包含评价正文的截图。"
     );
   }
 

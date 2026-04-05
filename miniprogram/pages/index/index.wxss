@@ -1,8 +1,12 @@
-/* 主色 #FFD100，与网页版一致 */
+.index-root {
+  min-height: 100%;
+}
+
+/* 主色 #FFD100，与网页版一致；底部为固定免责声明留出空间 */
 .page {
   padding: 24rpx;
-  padding-bottom: calc(24rpx + constant(safe-area-inset-bottom));
-  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(24rpx + 160rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(24rpx + 160rpx + env(safe-area-inset-bottom));
 }
 
 .card {
@@ -36,6 +40,27 @@
   min-height: 280rpx;
   display: flex;
   flex-direction: column;
+}
+
+.textarea-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 280rpx;
+}
+
+.review-clear-btn {
+  position: absolute;
+  top: 24rpx;
+  right: 24rpx;
+  width: 32rpx;
+  height: 32rpx;
+  line-height: 28rpx;
+  text-align: center;
+  font-size: 32rpx;
+  color: #999999;
+  z-index: 2;
 }
 
 .upload-half {
@@ -79,10 +104,23 @@
 
 .preview-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 16rpx;
   padding: 16rpx;
+}
+
+.preview-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.preview-actions-row-top {
   justify-content: center;
+}
+
+.preview-actions-row-bottom {
+  justify-content: flex-end;
 }
 
 .review-textarea {
@@ -108,6 +146,16 @@
 /* 参数区 */
 .param-block {
   margin-bottom: 24rpx;
+}
+
+.param-block-extra {
+  margin-top: 8rpx;
+  margin-bottom: 0;
+}
+
+.custom-input-fullwidth {
+  width: 100%;
+  display: block;
 }
 
 .param-row-dual {
@@ -197,6 +245,19 @@
   border: none !important;
 }
 
+/* 可点/加载中：保持高亮黄，避免微信 button[disabled] 默认半透明发灰 */
+.btn-primary:not(.btn-primary-idle)[disabled] {
+  opacity: 1 !important;
+}
+
+/* 无内容可生成时：整体灰态，无黄边 */
+.btn-primary.btn-primary-idle {
+  background: #f3f3f3 !important;
+  color: #888888 !important;
+  border: none !important;
+  box-shadow: none;
+}
+
 .btn-primary::after,
 .btn-secondary::after,
 .btn-outline::after,
@@ -213,6 +274,14 @@
   min-height: 88rpx;
   line-height: 96rpx;
   border: 2rpx solid #ffd100 !important;
+}
+
+/* 有截图或已输入评价时：识别并可点，主色美团黄 #FFD700 */
+.btn-secondary-on {
+  background: #ffd700 !important;
+  color: #1a1a1a !important;
+  border: 2rpx solid #ffd700 !important;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
 }
 
 .btn-outline {
@@ -314,8 +383,10 @@
 }
 
 .action-pill.active-f {
-  background: #fff8d6 !important;
-  border-color: #ffd100 !important;
+  background: #ffd100 !important;
+  border-color: #e6bc00 !important;
+  color: #1a1a1a !important;
+  font-weight: 600;
 }
 
 .action-pill.primary-lite {
@@ -449,4 +520,44 @@
 
 .legal-sep {
   color: #ccc;
+}
+
+/* 统一 Toast：半透明黑底、白字、8px 圆角、垂直居中 */
+.custom-toast-wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 10000;
+}
+
+.custom-toast-box {
+  background: rgba(51, 51, 51, 0.92);
+  color: #ffffff;
+  font-size: 28rpx;
+  border-radius: 16rpx;
+  padding: 24rpx 40rpx;
+  max-width: 80%;
+  text-align: center;
+  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.12);
+}
+
+/* 固定底部免责声明（不随页面滚动） */
+.ai-disclaimer-fixed {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: calc(40px + constant(safe-area-inset-bottom));
+  bottom: calc(40px + env(safe-area-inset-bottom));
+  text-align: center;
+  font-size: 24rpx;
+  color: #999999;
+  line-height: 1.5;
+  z-index: 500;
+  pointer-events: none;
 }

@@ -49,14 +49,14 @@
 }
 
 :root {
-  /* 店评小帮：白底 + 美团黄 #FFD100 主色 */
+  /* 店评小帮：白底 + 美团黄 #FFC107 主色 */
   --background: #ffffff;
   --foreground: #1a1a1a;
   --card: #ffffff;
   --card-foreground: #1a1a1a;
   --popover: #ffffff;
   --popover-foreground: #1a1a1a;
-  --primary: #ffd100;
+  --primary: #ffc107;
   --primary-foreground: #1a1a1a;
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: #1a1a1a;
@@ -76,7 +76,7 @@
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #ffd100;
+  --sidebar-primary: #ffc107;
   --sidebar-primary-foreground: #1a1a1a;
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);

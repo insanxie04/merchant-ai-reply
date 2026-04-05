@@ -1,5 +1,6 @@
 <wxs src="./index.wxs" module="fx" />
 
+<view class="index-root">
 <view class="page safe-bottom">
   <!-- 评价原文：上下各约 50% -->
   <view class="card">
@@ -16,21 +17,37 @@
         <block wx:else>
           <image class="preview-img" src="{{imageTempPath}}" mode="aspectFit" />
           <view class="preview-actions">
-            <button class="btn-outline btn-sm" bindtap="chooseImage" disabled="{{loading}}">重新上传</button>
-            <button class="btn-outline btn-sm" bindtap="extractOnly" disabled="{{loading}}">识别文字</button>
-            <button class="btn-ghost btn-sm" bindtap="clearImage" disabled="{{loading}}">移除图片</button>
+            <view class="preview-actions-row preview-actions-row-top">
+              <button class="btn-outline btn-sm" bindtap="chooseImage" disabled="{{loading}}">重新上传</button>
+              <button class="btn-ghost btn-sm" bindtap="clearImage" disabled="{{loading}}">移除图片</button>
+            </view>
+            <view class="preview-actions-row preview-actions-row-bottom">
+              <button
+                class="btn-outline btn-sm"
+                bindtap="extractOnly"
+                disabled="{{loading}}"
+                loading="{{loading && loadingKind === 'extract'}}"
+              >{{loading && loadingKind === 'extract' ? '识别中...' : '识别文字'}}</button>
+            </view>
           </view>
         </block>
       </view>
       <view class="textarea-half">
-        <textarea
-          class="review-textarea"
-          value="{{review}}"
-          bindinput="onReviewInput"
-          placeholder="或手动粘贴评价内容..."
-          maxlength="8000"
-          disabled="{{loading}}"
-        />
+        <view class="textarea-wrap">
+          <textarea
+            class="review-textarea"
+            value="{{review}}"
+            bindinput="onReviewInput"
+            placeholder="或手动粘贴评价内容..."
+            maxlength="8000"
+            disabled="{{loading}}"
+          />
+          <view
+            wx:if="{{showReviewClear}}"
+            class="review-clear-btn"
+            catchtap="clearReview"
+          >×</view>
+        </view>
       </view>
     </view>
     <text class="error-text" wx:if="{{reviewError}}">{{reviewError}}</text>
@@ -88,12 +105,29 @@
         </picker>
       </view>
     </view>
+
+    <view class="param-block param-block-extra">
+      <text class="label">追加要求（可选）</text>
+      <input
+        class="custom-input custom-input-fullwidth"
+        value="{{extraRequirements}}"
+        bindinput="onExtraRequirementsInput"
+        placeholder='例如：回复中请添加“欢迎下次光临”，不要使用表情'
+        placeholder-class="ph-gray"
+        maxlength="200"
+        disabled="{{loading}}"
+      />
+    </view>
   </view>
 
-  <!-- 操作按钮 -->
+  <!-- 操作按钮：仅「生成回复」，灰/黄状态与原逻辑一致 -->
   <view class="btn-row">
-    <button class="btn-primary" bindtap="generate" loading="{{loading}}" disabled="{{loading}}">生成回复</button>
-    <button class="btn-secondary" bindtap="recognizeAndGenerate" disabled="{{loading || !imageTempPath}}">识别并生成</button>
+    <button
+      class="btn-primary {{canGenerate ? '' : 'btn-primary-idle'}}"
+      bindtap="generate"
+      loading="{{loading && (loadingKind === 'generate' || loadingKind === 'recognize_extract' || loadingKind === 'recognize_generate')}}"
+      disabled="{{loading || !canGenerate}}"
+    >{{loadingKind === 'recognize_extract' ? '识别中...' : ((loadingKind === 'recognize_generate' || loadingKind === 'generate') ? '生成中...' : '生成回复')}}</button>
   </view>
 
   <!-- 加载/错误 -->
@@ -103,14 +137,19 @@
   <view class="error-banner" wx:if="{{error && !loading}}">{{error}}</view>
 
   <!-- 生成结果 -->
-  <view class="section-title" wx:if="{{replies.length}}">生成结果</view>
+  <view id="results-section-title" class="section-title" wx:if="{{replyRows.length}}">生成结果</view>
   <view class="reply-list">
-    <view class="reply-card" wx:for="{{replies}}" wx:key="*this" wx:for-index="ri">
-      <text class="reply-body">{{item}}</text>
+    <view class="reply-card" wx:for="{{replyRows}}" wx:key="id" wx:for-index="ri">
+      <text class="reply-body">{{item.text}}</text>
       <view class="reply-actions">
         <button class="action-pill {{fx.feedback(replyFeedback, ri) === 'like' ? 'active' : ''}}" data-index="{{ri}}" data-kind="like" bindtap="toggleFeedback">点赞</button>
         <button class="action-pill {{fx.feedback(replyFeedback, ri) === 'dislike' ? 'active-d' : ''}}" data-index="{{ri}}" data-kind="dislike" bindtap="toggleFeedback">点踩</button>
-        <button class="action-pill {{fx.favorited(favorites, item) ? 'active-f' : ''}}" data-index="{{ri}}" bindtap="toggleFavorite">收藏</button>
+        <button
+          class="action-pill {{fx.favoritedRow(favorites, item.id) ? 'active-f' : ''}}"
+          data-rowid="{{item.id}}"
+          data-text="{{item.text}}"
+          bindtap="toggleFavorite"
+        >{{fx.favoritedRow(favorites, item.id) ? '已收藏' : '收藏'}}</button>
         <button class="action-pill primary-lite" data-index="{{ri}}" bindtap="copyReply">复制</button>
       </view>
     </view>
@@ -138,7 +177,8 @@
             value="{{item.note}}"
             data-id="{{item.id}}"
             bindinput="onFavNoteInput"
-            placeholder="备注（可选）"
+            placeholder="添加备注，方便查找"
+            placeholder-class="ph-gray"
             auto-height
           />
           <view class="fav-item-actions">
@@ -158,4 +198,11 @@
     <text class="legal-sep">|</text>
     <navigator url="/pages/about/about" class="legal-link">关于</navigator>
   </view>
+
+  <view class="custom-toast-wrap" wx:if="{{customToastVisible}}">
+    <view class="custom-toast-box">{{customToastText}}</view>
+  </view>
+</view>
+
+<view class="ai-disclaimer-fixed">AI生成内容仅供参考，请根据实际情况调整使用</view>
 </view>

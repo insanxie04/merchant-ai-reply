@@ -3,7 +3,10 @@ export function countVisualChars(s: string): number {
   return [...s.trim()].length;
 }
 
-/** 从模型输出中解析 {"replies":["a","b","c"]} */
+/**
+ * 从模型输出中解析 {"replies":["a","b","c"]}。
+ * 长度偏好仅在提示词中引导模型，此处不做字数区间校验，避免因模型略短/略长导致整次生成失败。
+ */
 export function parseRepliesPayload(content: string): string[] {
   const raw = content.trim();
   const start = raw.indexOf("{");
@@ -36,17 +39,6 @@ export function parseRepliesPayload(content: string): string[] {
 
   if (replies.some((r) => r.length === 0)) {
     throw new Error("模型返回了空回复，请重试。");
-  }
-
-  const MIN = 50;
-  const MAX = 150;
-  for (let i = 0; i < replies.length; i++) {
-    const n = countVisualChars(replies[i]);
-    if (n < MIN || n > MAX) {
-      throw new Error(
-        `第 ${i + 1} 条回复长度需在 ${MIN}–${MAX} 字之间（当前约 ${n} 字），请重试。`
-      );
-    }
   }
 
   return replies;

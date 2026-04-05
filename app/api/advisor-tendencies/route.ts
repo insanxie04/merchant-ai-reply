@@ -2,22 +2,26 @@ import { NextResponse } from "next/server";
 import { endpointIdConfigError } from "@/lib/ark-endpoint-id";
 import { DEFAULT_BASE, mapArkErrorStatus } from "@/lib/ark-errors";
 import {
-  buildMeituanReplyUserPrompt,
-  GENERAL_MERCHANT_REPLY_SYSTEM_PROMPT,
-  PRESET_STYLE_LIST,
-  type PresetStyle,
-} from "@/lib/meituan-reply-prompt";
+  ADVISOR_REPLY_SCHEMES_SYSTEM,
+  buildAdvisorReplySchemesGenerationContext,
+  buildAdvisorReplySchemesUserPrompt,
+  parseAdvisorTendencyLines,
+  type AdvisorRatingType,
+} from "@/lib/bad-review-advisor";
 import { CATEGORY_PRESET_SET } from "@/lib/merchant-categories";
 import { lengthBounds, LENGTH_PREFERENCE_IDS } from "@/lib/length-preference";
-import { parseRepliesPayload } from "@/lib/parse-replies";
+import { PRESET_STYLE_LIST, type PresetStyle } from "@/lib/meituan-reply-prompt";
 
 const MAX_CUSTOM_CATEGORY_LEN = 50;
 const PRESET_STYLES = new Set<string>(PRESET_STYLE_LIST);
-const RATING_TYPES = new Set(["好评", "中评", "差评"]);
 const LENGTH_PREF_SET = new Set<string>(LENGTH_PREFERENCE_IDS);
 
 function isPresetStyle(s: string): s is PresetStyle {
   return PRESET_STYLES.has(s);
+}
+
+function isAdvisorRatingType(s: string): s is AdvisorRatingType {
+  return s === "好评" || s === "中评" || s === "差评";
 }
 
 export async function POST(request: Request) {
@@ -31,7 +35,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "服务未配置：请在项目根目录 .env.local 中设置 DOUBAO_API_KEY 与 DOUBAO_MODEL_ID（火山方舟推理接入点 ID，如 ep-xxxx）。",
+          "服务未配置：请在项目根目录 .env.local 中设置 DOUBAO_API_KEY 与 DOUBAO_MODEL_ID。",
       },
       { status: 503 }
     );
@@ -51,9 +55,24 @@ export async function POST(request: Request) {
 
   const body = json as Record<string, unknown>;
   const review = typeof body.review === "string" ? body.review.trim() : "";
-  const category = typeof body.category === "string" ? body.category : "";
-  const styleRaw = typeof body.style === "string" ? body.style : "";
-  const ratingType = typeof body.ratingType === "string" ? body.ratingType : "";
+  const coreAnalysis =
+    typeof body.coreAnalysis === "string" ? body.coreAnalysis.trim() : "";
+  const ratingTypeRaw =
+    typeof body.ratingType === "string" ? body.ratingType.trim() : "";
+
+  if (!review) {
+    return NextResponse.json({ error: "评价原文不能为空。" }, { status: 400 });
+  }
+  if (!coreAnalysis) {
+    return NextResponse.json({ error: "核心分析不能为空。" }, { status: 400 });
+  }
+  if (!isAdvisorRatingType(ratingTypeRaw)) {
+    return NextResponse.json({ error: "评价类型无效。" }, { status: 400 });
+  }
+
+  const categoryRaw =
+    typeof body.category === "string" ? body.category.trim() : "";
+  const styleRaw = typeof body.style === "string" ? body.style.trim() : "";
   const customPersona =
     typeof body.customPersona === "string" ? body.customPersona.trim() : "";
   if (customPersona.length > 100) {
@@ -65,55 +84,53 @@ export async function POST(request: Request) {
   const lengthPreferenceRaw =
     typeof body.lengthPreference === "string"
       ? body.lengthPreference.trim()
-      : "medium";
-  if (!LENGTH_PREF_SET.has(lengthPreferenceRaw)) {
-    return NextResponse.json({ error: "长度偏好无效。" }, { status: 400 });
-  }
-  const lengthMeta = lengthBounds(lengthPreferenceRaw);
-
-  const extraRequirements =
-    typeof body.extraRequirements === "string"
-      ? body.extraRequirements.trim()
       : "";
-  if (extraRequirements.length > 200) {
-    return NextResponse.json(
-      { error: "追加要求不能超过 200 字。" },
-      { status: 400 }
-    );
+  const diversifyNonceRaw =
+    typeof body.diversifyNonce === "string"
+      ? body.diversifyNonce.trim().slice(0, 64)
+      : "";
+
+  let generationContext = null;
+  if (categoryRaw) {
+    if (!isPresetStyle(styleRaw)) {
+      return NextResponse.json(
+        { error: "回复语气（风格）无效。" },
+        { status: 400 }
+      );
+    }
+    if (!lengthPreferenceRaw || !LENGTH_PREF_SET.has(lengthPreferenceRaw)) {
+      return NextResponse.json({ error: "长度偏好无效。" }, { status: 400 });
+    }
+    if (CATEGORY_PRESET_SET.has(categoryRaw)) {
+      /* ok */
+    } else if (
+      categoryRaw.length <= MAX_CUSTOM_CATEGORY_LEN &&
+      !/[\r\n]/.test(categoryRaw)
+    ) {
+      /* ok */
+    } else {
+      return NextResponse.json({ error: "商家品类无效。" }, { status: 400 });
+    }
+    const lenMeta = lengthBounds(lengthPreferenceRaw);
+    generationContext = buildAdvisorReplySchemesGenerationContext({
+      category: categoryRaw,
+      presetStyle: styleRaw,
+      customPersona: customPersona || null,
+      lengthPreference: lenMeta,
+    });
   }
 
-  if (!review) {
-    return NextResponse.json({ error: "评价内容不能为空。" }, { status: 400 });
-  }
-  if (!category) {
-    return NextResponse.json({ error: "商家品类不能为空。" }, { status: 400 });
-  }
-  if (CATEGORY_PRESET_SET.has(category)) {
-    /* preset ok */
-  } else if (
-    category.length <= MAX_CUSTOM_CATEGORY_LEN &&
-    !/[\r\n]/.test(category)
-  ) {
-    /* custom category ok */
-  } else {
-    return NextResponse.json({ error: "商家品类无效。" }, { status: 400 });
-  }
-  if (!isPresetStyle(styleRaw)) {
-    return NextResponse.json({ error: "回复语气（风格）无效。" }, { status: 400 });
-  }
-  if (!RATING_TYPES.has(ratingType)) {
-    return NextResponse.json({ error: "评价类型无效。" }, { status: 400 });
-  }
+  const diversifyHint = diversifyNonceRaw
+    ? `批次标识 ${diversifyNonceRaw}：请与常见套路及历史输出明显区分，三条之间差异最大化。`
+    : null;
 
-  const userPrompt = buildMeituanReplyUserPrompt({
+  const userContent = buildAdvisorReplySchemesUserPrompt(
+    ratingTypeRaw,
     review,
-    category,
-    ratingType,
-    customPersona: customPersona || null,
-    presetStyle: styleRaw,
-    extraRequirements: extraRequirements || null,
-    lengthPreference: lengthMeta,
-  });
+    coreAnalysis,
+    generationContext,
+    diversifyHint
+  );
 
   let res: Response;
   try {
@@ -126,11 +143,11 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model: modelId,
         messages: [
-          { role: "system", content: GENERAL_MERCHANT_REPLY_SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
+          { role: "system", content: ADVISOR_REPLY_SCHEMES_SYSTEM },
+          { role: "user", content: userContent },
         ],
-        temperature: 0.75,
-        max_tokens: 2400,
+        temperature: 0.78,
+        max_tokens: 512,
       }),
       signal: AbortSignal.timeout(90_000),
     });
@@ -140,12 +157,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "请求超时，请检查网络后重试。" },
         { status: 504 }
-      );
-    }
-    if (err.cause?.code === "ENOTFOUND" || err.cause?.code === "ECONNREFUSED") {
-      return NextResponse.json(
-        { error: "网络连接失败，请检查网络或稍后再试。" },
-        { status: 502 }
       );
     }
     return NextResponse.json(
@@ -192,16 +203,18 @@ export async function POST(request: Request) {
   const content = data.choices?.[0]?.message?.content;
   if (typeof content !== "string" || !content.trim()) {
     return NextResponse.json(
-      { error: "模型未返回有效文本，请重试。" },
+      { error: "模型未返回有效回复方案内容，请重试。" },
       { status: 502 }
     );
   }
 
-  try {
-    const replies = parseRepliesPayload(content);
-    return NextResponse.json({ replies });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "解析生成结果失败，请重试。";
-    return NextResponse.json({ error: msg }, { status: 502 });
+  const tendencies = parseAdvisorTendencyLines(content.trim());
+  if (tendencies.length !== 3) {
+    return NextResponse.json(
+      { error: "回复方案解析失败，请重试。" },
+      { status: 502 }
+    );
   }
+
+  return NextResponse.json({ tendencies });
 }

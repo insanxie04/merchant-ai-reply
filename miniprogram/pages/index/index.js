@@ -27,20 +27,83 @@ Page({
     reviewError: "",
     imageTempPath: "",
     loading: false,
+    loadingKind: "idle",
     loadingHint: "",
     error: "",
-    replies: [],
+    replyRows: [],
     replyFeedback: {},
     favorites: [],
     favoritesOpen: false,
     favoriteTab: "praise",
     filteredFavorites: [],
+    canGenerate: false,
+    showReviewClear: false,
+    customToastVisible: false,
+    customToastText: "",
+    extraRequirements: "",
   },
+
+  _toastTimer: null,
 
   onLoad() {
     const favorites = fav.loadFavorites();
-    this.setData({ favorites });
+    this.setData({
+      favorites,
+      favoritesOpen: favorites.length > 0,
+    });
     this._updateFilteredFavorites();
+    this._syncGenerateBtnState();
+    this._syncReviewClear();
+  },
+
+  /** 将接口返回的文案列表转为带稳定 id 的行（避免 wx:key 与收藏状态错乱） */
+  _rowsFromApiReplies(texts) {
+    const arr = Array.isArray(texts) ? texts : [];
+    return arr.map((t) => ({
+      id: fav.createId(),
+      text: typeof t === "string" ? t : "",
+    }));
+  },
+
+  onUnload() {
+    if (this._toastTimer) {
+      clearTimeout(this._toastTimer);
+      this._toastTimer = null;
+    }
+  },
+
+  showCustomToast(title) {
+    if (this._toastTimer) {
+      clearTimeout(this._toastTimer);
+      this._toastTimer = null;
+    }
+    this.setData({ customToastVisible: true, customToastText: title });
+    this._toastTimer = setTimeout(() => {
+      this.setData({ customToastVisible: false });
+      this._toastTimer = null;
+    }, 1500);
+  },
+
+  _syncGenerateBtnState() {
+    const has =
+      !!(this.data.imageTempPath || (this.data.review || "").trim());
+    this.setData({ canGenerate: has });
+  },
+
+  _syncReviewClear() {
+    const show =
+      !!(this.data.review || "").trim() && !this.data.loading;
+    this.setData({ showReviewClear: show });
+  },
+
+  _scrollToResults() {
+    setTimeout(() => {
+      wx.pageScrollTo({
+        selector: "#results-section-title",
+        duration: 400,
+        fail: () => {},
+      });
+    }, 150);
   },
 
   _updateFilteredFavorites() {
@@ -65,6 +128,18 @@ Page({
     if (persona) return "亲切热情";
     if (this.data.styleIndex === STYLE_CUSTOM_INDEX) return "亲切热情";
     return C.PRESET_STYLE_LIST[this.data.styleIndex];
+  },
+
+  /** 非空时写入生成接口 optional 字段 */
+  _applyExtraRequirementsToPayload(payload) {
+    const ex = (this.data.extraRequirements || "").trim();
+    if (ex) payload.extraRequirements = ex;
+  },
+
+  onExtraRequirementsInput(e) {
+    this.setData({
+      extraRequirements: (e.detail.value || "").slice(0, 200),
+    });
   },
 
   onCategoryChange(e) {
@@ -99,7 +174,24 @@ Page({
     if (this.data.imageTempPath) {
       patch.imageTempPath = "";
     }
-    this.setData(patch);
+    this.setData(patch, () => {
+      this._syncGenerateBtnState();
+      this._syncReviewClear();
+    });
+  },
+
+  clearReview() {
+    if (this.data.loading) return;
+    this.setData(
+      {
+        review: "",
+        reviewError: "",
+      },
+      () => {
+        this._syncGenerateBtnState();
+        this._syncReviewClear();
+      }
+    );
   },
 
   /** 选择相册/拍照 */
@@ -113,22 +205,27 @@ Page({
         const file = res.tempFiles[0];
         if (!file) return;
         if (file.size > C.MAX_IMAGE_BYTES) {
-          wx.showToast({
-            title: "图片需小于4MB",
-            icon: "none",
-          });
+          this.showCustomToast("图片需小于4MB");
           return;
         }
-        this.setData({
-          imageTempPath: file.tempFilePath,
-          error: "",
-        });
+        this.setData(
+          {
+            imageTempPath: file.tempFilePath,
+            error: "",
+          },
+          () => {
+            this._syncGenerateBtnState();
+            this._syncReviewClear();
+          }
+        );
       },
     });
   },
 
   clearImage() {
-    this.setData({ imageTempPath: "" });
+    this.setData({ imageTempPath: "" }, () => {
+      this._syncGenerateBtnState();
+    });
   },
 
   /** 读取临时图片为 base64，推断 mime */
@@ -152,95 +249,136 @@ Page({
     if (this.data.loading) return;
     const path = this.data.imageTempPath;
     if (!path) {
-      wx.showToast({ title: "请先选择图片", icon: "none" });
+      this.showCustomToast("请先选择图片");
       return;
     }
-    this.setData({ loading: true, loadingHint: "识别图片中…", error: "", replies: [], replyFeedback: {} });
-    wx.showLoading({ title: "识别中…", mask: true });
+    this.setData({
+      loading: true,
+      loadingKind: "extract",
+      loadingHint: "识别图片中…",
+      error: "",
+      replyRows: [],
+      replyFeedback: {},
+    });
+    this._syncReviewClear();
     try {
       const { mimeType, imageBase64 } = this._readImageBase64(path);
       const text = await api.extractReviewFromImage(mimeType, imageBase64);
-      this.setData({ review: text, reviewError: "" });
-      wx.showToast({ title: "已填入识别结果", icon: "success" });
+      this.setData(
+        {
+          review: text,
+          reviewError: "",
+          imageTempPath: "",
+        },
+        () => {
+          this._syncGenerateBtnState();
+          this._syncReviewClear();
+        }
+      );
+      this.showCustomToast("识别成功");
     } catch (err) {
       const msg = err.message || "识图失败";
       this.setData({ error: msg });
-      wx.showToast({ title: msg, icon: "none", duration: 2500 });
+      this.showCustomToast("识别失败，请重试");
     } finally {
-      wx.hideLoading();
-      this.setData({ loading: false, loadingHint: "" });
+      this.setData({ loading: false, loadingKind: "idle", loadingHint: "" }, () => {
+        this._syncReviewClear();
+      });
     }
   },
 
-  async recognizeAndGenerate() {
-    if (this.data.loading) return;
-    const path = this.data.imageTempPath;
-    if (!path) {
-      wx.showToast({ title: "请先选择图片", icon: "none" });
-      return;
-    }
-    const cat = this.getEffectiveCategory();
-    if (!cat) {
-      wx.showToast({ title: "请选择或输入商家品类", icon: "none" });
-      return;
-    }
-    this.setData({
-      loading: true,
-      loadingHint: "识别并生成中…",
-      error: "",
-      replies: [],
-      replyFeedback: {},
-      reviewError: "",
-    });
-    wx.showLoading({ title: "处理中…", mask: true });
-    try {
-      const { mimeType, imageBase64 } = this._readImageBase64(path);
-      const text = await api.extractReviewFromImage(mimeType, imageBase64);
-      this.setData({ review: text });
-      wx.showLoading({ title: "生成回复中…", mask: true });
-      const persona = this.getEffectivePersona();
-      const payload = {
-        review: text,
-        category: cat,
-        style: this.getApiStyle(),
-        ratingType: C.RATING_TYPES[this.data.ratingIndex],
-      };
-      if (persona) payload.customPersona = persona;
-      const replies = await api.generateReplies(payload);
-      this.setData({ replies });
-      wx.showToast({ title: "已生成3条回复", icon: "success" });
-    } catch (err) {
-      const msg = err.message || "处理失败";
-      this.setData({ error: msg });
-      wx.showToast({ title: msg, icon: "none", duration: 2500 });
-    } finally {
-      wx.hideLoading();
-      this.setData({ loading: false, loadingHint: "" });
-    }
-  },
-
+  /**
+   * 生成回复：有图且无字则先识别再生成；已有文字则直接生成。
+   * 识图 API 仅在本按钮（先识别分支）或用户点击「识别文字」时调用，无自动识图。
+   */
   async generate() {
     if (this.data.loading) return;
+    const path = this.data.imageTempPath;
     const trimmed = (this.data.review || "").trim();
-    if (!trimmed) {
-      this.setData({ reviewError: "请粘贴或输入评价内容" });
-      wx.showToast({ title: "请填写评价原文", icon: "none" });
+    if (!path && !trimmed) {
+      this.showCustomToast("请先上传截图或输入评价内容");
       return;
     }
     const cat = this.getEffectiveCategory();
     if (!cat) {
-      wx.showToast({ title: "请选择或输入商家品类", icon: "none" });
+      this.showCustomToast("请选择或输入商家品类");
+      return;
+    }
+
+    if (path && !trimmed) {
+      this.setData({
+        loading: true,
+        loadingKind: "recognize_extract",
+        loadingHint: "识别并生成中…",
+        error: "",
+        replyRows: [],
+        replyFeedback: {},
+        reviewError: "",
+      });
+      this._syncReviewClear();
+      let chainPhase = "extract";
+      try {
+        const { mimeType, imageBase64 } = this._readImageBase64(path);
+        const text = await api.extractReviewFromImage(mimeType, imageBase64);
+        this.setData(
+          {
+            review: text,
+            loadingKind: "recognize_generate",
+            loadingHint: "生成回复中…",
+          },
+          () => {
+            this._syncGenerateBtnState();
+            this._syncReviewClear();
+          }
+        );
+        chainPhase = "generate";
+        const persona = this.getEffectivePersona();
+        const payload = {
+          review: text,
+          category: cat,
+          style: this.getApiStyle(),
+          ratingType: C.RATING_TYPES[this.data.ratingIndex],
+        };
+        if (persona) payload.customPersona = persona;
+        this._applyExtraRequirementsToPayload(payload);
+        const replies = await api.generateReplies(payload);
+        this.setData({ replyRows: this._rowsFromApiReplies(replies) });
+        this.showCustomToast("生成成功");
+        this._scrollToResults();
+      } catch (err) {
+        const msg = err.message || "处理失败";
+        this.setData({ error: msg });
+        if (chainPhase === "extract") {
+          this.showCustomToast("识别失败，请重试");
+        } else {
+          this.showCustomToast("生成失败，请重试");
+        }
+      } finally {
+        this.setData(
+          { loading: false, loadingKind: "idle", loadingHint: "" },
+          () => {
+            this._syncReviewClear();
+          }
+        );
+      }
+      return;
+    }
+
+    if (!trimmed) {
+      this.setData({ reviewError: "请粘贴或输入评价内容" });
+      this.showCustomToast("请填写评价原文");
       return;
     }
     this.setData({
       loading: true,
+      loadingKind: "generate",
       loadingHint: "生成中…",
       error: "",
-      replies: [],
+      replyRows: [],
       replyFeedback: {},
       reviewError: "",
     });
-    wx.showLoading({ title: "生成中…", mask: true });
+    this._syncReviewClear();
     try {
       const persona = this.getEffectivePersona();
       const payload = {
@@ -250,27 +388,33 @@ Page({
         ratingType: C.RATING_TYPES[this.data.ratingIndex],
       };
       if (persona) payload.customPersona = persona;
+      this._applyExtraRequirementsToPayload(payload);
       const replies = await api.generateReplies(payload);
-      this.setData({ replies });
-      wx.showToast({ title: "已生成", icon: "success" });
+      this.setData({ replyRows: this._rowsFromApiReplies(replies) });
+      this.showCustomToast("生成成功");
+      this._scrollToResults();
     } catch (err) {
       const msg = err.message || "生成失败";
       this.setData({ error: msg });
-      wx.showToast({ title: msg, icon: "none", duration: 2500 });
+      this.showCustomToast("生成失败，请重试");
     } finally {
-      wx.hideLoading();
-      this.setData({ loading: false, loadingHint: "" });
+      this.setData(
+        { loading: false, loadingKind: "idle", loadingHint: "" },
+        () => {
+          this._syncReviewClear();
+        }
+      );
     }
   },
 
   copyReply(e) {
-    const i = e.currentTarget.dataset.index;
-    const text = this.data.replies[i];
-    if (!text) return;
+    const i = Number(e.currentTarget.dataset.index);
+    const row = this.data.replyRows[i];
+    if (!row || !row.text) return;
     wx.setClipboardData({
-      data: text,
+      data: row.text,
       success: () => {
-        wx.showToast({ title: `回复${i + 1}已复制`, icon: "success" });
+        this.showCustomToast("复制成功");
       },
     });
   },
@@ -283,35 +427,35 @@ Page({
     const next = { ...this.data.replyFeedback };
     if (cur === kind) {
       delete next[key];
-      wx.showToast({ title: "已取消反馈", icon: "none" });
+      this.showCustomToast("已取消反馈");
     } else {
       next[key] = kind;
-      wx.showToast({
-        title: kind === "like" ? "感谢反馈" : "已记录",
-        icon: "success",
-      });
+      this.showCustomToast(kind === "like" ? "感谢反馈" : "已记录");
     }
     this.setData({ replyFeedback: next });
   },
 
   toggleFavorite(e) {
-    const i = e.currentTarget.dataset.index;
-    const text = this.data.replies[i];
-    if (!text) return;
+    const rowId = e.currentTarget.dataset.rowid;
+    const text = (e.currentTarget.dataset.text || "").trim();
+    if (!rowId || !text) return;
     const list = this.data.favorites.slice();
-    const existing = list.find((f) => f.text === text);
+    const existing = list.find((f) => f.replyRowId === rowId);
     if (existing) {
       const next = list.filter((f) => f.id !== existing.id);
-      this.setData({ favorites: next });
+      const patch = { favorites: next };
+      if (next.length === 0) patch.favoritesOpen = false;
+      this.setData(patch);
       fav.saveFavorites(next);
       this._updateFilteredFavorites();
-      wx.showToast({ title: "已取消收藏", icon: "success" });
+      this.showCustomToast("已取消收藏");
       return;
     }
     const ratingType = C.RATING_TYPES[this.data.ratingIndex];
     list.push({
       id: fav.createId(),
       text,
+      replyRowId: rowId,
       savedAt: Date.now(),
       bucket: fav.ratingTypeToBucket(ratingType),
       note: "",
@@ -319,11 +463,7 @@ Page({
     this.setData({ favorites: list });
     fav.saveFavorites(list);
     this._updateFilteredFavorites();
-    wx.showToast({ title: "已加入收藏", icon: "success" });
-  },
-
-  isFavorited(text) {
-    return this.data.favorites.some((f) => f.text === text);
+    this.showCustomToast("收藏成功");
   },
 
   toggleFavoritesPanel() {
@@ -355,16 +495,18 @@ Page({
     if (!item) return;
     wx.setClipboardData({
       data: item.text,
-      success: () => wx.showToast({ title: "已复制", icon: "success" }),
+      success: () => this.showCustomToast("复制成功"),
     });
   },
 
   removeFavorite(e) {
     const id = e.currentTarget.dataset.id;
     const list = this.data.favorites.filter((f) => f.id !== id);
-    this.setData({ favorites: list });
+    const patch = { favorites: list };
+    if (list.length === 0) patch.favoritesOpen = false;
+    this.setData(patch);
     fav.saveFavorites(list);
     this._updateFilteredFavorites();
-    wx.showToast({ title: "已删除", icon: "success" });
+    this.showCustomToast("删除成功");
   },
 });

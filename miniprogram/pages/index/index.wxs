@@ -1,8 +1,8 @@
-/** 判断某条回复是否已在收藏列表中（wxml 内调用） */
-function favorited(list, text) {
-  if (!list || !text) return false;
+/** 按当前回复行 id 判断是否已收藏（避免同文多条卡片状态错乱） */
+function favoritedRow(list, rowId) {
+  if (!list || !rowId) return false;
   for (var i = 0; i < list.length; i++) {
-    if (list[i].text === text) return true;
+    if (list[i].replyRowId === rowId) return true;
   }
   return false;
 }
@@ -16,5 +16,5 @@ function feedback(map, idx) {
   return "";
 }
 
-module.exports.favorited = favorited;
+module.exports.favoritedRow = favoritedRow;
 module.exports.feedback = feedback;

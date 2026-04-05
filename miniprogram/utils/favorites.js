@@ -23,7 +23,9 @@ function normalizeItem(row) {
       : Date.now();
   const bucket = isBucket(row.bucket) ? row.bucket : "praise";
   const note = typeof row.note === "string" ? row.note : "";
-  return { id: row.id, text: row.text, savedAt, bucket, note };
+  const replyRowId =
+    typeof row.replyRowId === "string" ? row.replyRowId : undefined;
+  return { id: row.id, text: row.text, savedAt, bucket, note, replyRowId };
 }
 
 /** 读取收藏列表 */
@@ -46,6 +48,8 @@ function loadFavorites() {
               typeof row.savedAt === "number" ? row.savedAt : Date.now(),
             bucket: "praise",
             note: "",
+            replyRowId:
+              typeof row.replyRowId === "string" ? row.replyRowId : undefined,
           };
         })
         .filter(Boolean);

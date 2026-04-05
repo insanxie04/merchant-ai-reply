@@ -6,7 +6,7 @@ App({
      * 示例：https://your-domain.com
      * 勿以 / 结尾；与 Next 部署同源时路径为 /api/...
      */
-    apiBase: "",
+    apiBase: "https://merchant-ai-reply.vercel.app",
   },
 
   onLaunch() {
